@@ -104,8 +104,9 @@ void  Solenoid :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param
 	double beta = Xold[6];
 	double sk = sqrt((Param[3]/beta)*(Param[3]/beta));
 	double alpha = (Param[2]) * sk;
-	double phi = (zeta - Param[1]) * sk;
-
+//	double phi = (zeta - Param[1]) * sk;
+	double phi = zeta * sk;
+	
 	double *ret = new double[4];
 	double M[4][4], R[4][4];
 	for(int i=0; i < 4; i++)
@@ -156,7 +157,8 @@ void  Focusing :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param
 	// Param[] = {tipo, posizione_iniziale, lunghezza, campo}
 	double kF = Param[3];
 
-	double zetaF = zeta - Param[1];
+//	double zetaF = zeta - Param[1];
+	double zetaF = zeta;
 
 	double sqrtkF = sqrt(kF);
 	double skF = sin(sqrtkF * zetaF);
@@ -190,7 +192,8 @@ void  Defocusing :: mappa_(double *Xold,  double *Xnew, double zeta, double *Par
 	// Param[] = {tipo, posizione_iniziale, lunghezza, campo}
 	double kD = Param[3];
 
-	double zetaD = zeta - Param[1];
+//	double zetaD = zeta - Param[1];
+	double zetaD = zeta;
 
 	double sqrtkD = sqrt(kD);
 	double skD = sin(sqrtkD * zetaD);
@@ -218,8 +221,13 @@ void  Defocusing :: mappa_(double *Xold,  double *Xnew, double zeta, double *Par
 }
 
 
-void create_gnuplot_file(std::string gnuplot_filename, std::string run_name, double *param)
+void create_gnuplot_file(std::string gnuplot_filename, std::string run_name, double *param, int numero_elementi_lattice, double estremo, double zmin, double zmax)
 {
+	double * separazioni = new double[numero_elementi_lattice];
+	for (int i = 0; i < numero_elementi_lattice; i++)
+	{
+		separazioni[i] = param[N_PARAMETRI_LATTICINO*i+1];
+	}
 	std::ofstream gnuplot_file;
 	gnuplot_file.open(gnuplot_filename.c_str());
 
@@ -227,9 +235,16 @@ void create_gnuplot_file(std::string gnuplot_filename, std::string run_name, dou
 	gnuplot_file << "FILE1=\"out_" << run_name << ".ppg\"" << std::endl;
 	gnuplot_file << "set terminal postscript eps enhanced colour solid rounded \"Helvetica\" 25" << std::endl;
 	gnuplot_file << "set output \"graph_" << run_name << ".eps\"" << std::endl;
+	gnuplot_file << "set xrange[" << zmin << ":" << zmax << "]" << std::endl;
+	gnuplot_file << "set yrange[" << -estremo << ":" << estremo << "]" << std::endl;
 	gnuplot_file << "set xlabel \"z (cm)\"" << std::endl;
-	gnuplot_file << "plot FILE1 u 4:1 w lines lt 1 lc rgb \"red\" lw 3 t \"x\",\\" << std::endl;
-	gnuplot_file << "FILE1 u 4:3 w lines lt 1 lc rgb \"blue\" lw 3 t \"y\"" << std::endl;
+	gnuplot_file << "set ylabel \"x,y (cm)\"" << std::endl;
+	for (int i = 0; i < numero_elementi_lattice; i++)
+	{
+		gnuplot_file << "set arrow from " << separazioni[i] << "," << -estremo << " to " << separazioni[i] << "," << estremo << " nohead lc rgb \"black\" lw 1" << std::endl;
+	}
+	gnuplot_file << "plot FILE1 u 3:1 w lines lt 1 lc rgb \"red\" lw 3 t \"x\",\\" << std::endl;
+	gnuplot_file << "FILE1 u 3:2 w lines lt 1 lc rgb \"blue\" lw 3 t \"y\"" << std::endl;
 
 	gnuplot_file.close();
 }
@@ -239,9 +254,9 @@ int main(int argc, char *argv[])
 {
 	int major_version=1;
 	int minor_version=0;
-	int fix_release=0;
-	std::string release_date="April 25, 2012";
-	std::string latest_commit="first stable release";
+	int fix_release=1;
+	std::string release_date="April 26, 2012";
+	std::string latest_commit="bugfixing, still not working as expected";
 
 	std::string run_name="test";
 	std::ifstream parametri_sim, parametri_lattice;
@@ -333,49 +348,30 @@ int main(int argc, char *argv[])
 		parametri_sim >> utile_per_contare;
 		parametri_sim >> utile_per_leggere;
 		parametro_letto = utile_per_leggere.c_str();
-		if (utile_per_contare == "ZMAX_CM")
-		{
-			zmax = atof(parametro_letto);
-			log_temp << "ZMAX (in cm): " << zmax << std::endl;
-		}
-		else if (utile_per_contare == "NSTEPS") 
-		{
-			nsteps = atoi(parametro_letto);
-			log_temp << "Number of steps: " << nsteps << std::endl;
-		}
-		else if (utile_per_contare == "X0") 
-		{
-			x0 = atof(parametro_letto);
-			log_temp << "initial x position (in cm): " << x0 << std::endl;
-		}
-		else if (utile_per_contare == "Y0") 
-		{
-			y0 = atof(parametro_letto);
-			log_temp << "initial y position (in cm): " << y0 << std::endl;
-		}
-		else if (utile_per_contare == "Z0") 
-		{
-			z0 = atof(parametro_letto);
-			log_temp << "initial z position (in cm): " << z0 << std::endl;
-		}
-		else if (utile_per_contare == "PX0") 
-		{
-			px0 = atof(parametro_letto);
-			log_temp << "initial px (normalized): " << px0 << std::endl;
-		}
-		else if (utile_per_contare == "PY0") 
-		{
-			py0 = atof(parametro_letto);
-			log_temp << "initial py (normalized): " << py0 << std::endl;
-		}
-		else if (utile_per_contare == "E0") 
-		{
-			E0 = atof(parametro_letto);
-			log_temp << "Energy (in MeV): " << E0 << std::endl;
-		}
-		else log_temp << "Unrecognized parameter: " << utile_per_contare << std::endl;
+		if (utile_per_contare == "ZMAX_CM") zmax = atof(parametro_letto);
+		else if (utile_per_contare == "NSTEPS") nsteps = atoi(parametro_letto);
+		else if (utile_per_contare == "X0") x0 = atof(parametro_letto);
+		else if (utile_per_contare == "Y0") y0 = atof(parametro_letto);
+		else if (utile_per_contare == "Z0") z0 = atof(parametro_letto);
+		else if (utile_per_contare == "PX0") px0 = atof(parametro_letto);
+		else if (utile_per_contare == "PY0") py0 = atof(parametro_letto);
+		else if (utile_per_contare == "E0_MEV") E0 = atof(parametro_letto);
+		else log_file << "Unrecognized parameter: " << utile_per_contare << std::endl;
 	}
 
+	double beta = sqrt(2.0*E0/MP_MEV);
+	double pz0 = sqrt(beta*beta - px0*px0 - py0*py0);
+
+	log_file << "ZMAX (in cm): " << zmax << std::endl;
+	log_file << "Number of steps: " << nsteps << std::endl;
+	log_file << "Energy (in MeV): " << E0 << std::endl;
+	log_file << "initial x position (in cm): " << x0 << std::endl;
+	log_file << "initial y position (in cm): " << y0 << std::endl;
+	log_file << "initial z position (in cm): " << z0 << std::endl;
+	log_file << "initial px (normalized): " << px0 << std::endl;
+	log_file << "initial py (normalized): " << py0 << std::endl;
+	log_file << "pz (normalized): " << pz0 << std::endl;
+	log_file << "beta (tot): " << beta << std::endl;
 
 	int *N_tipi = new int[N_TIPI_MAGNETICI];
 	memset((void *)N_tipi, 0, N_TIPI_MAGNETICI * sizeof(int));
@@ -386,11 +382,11 @@ int main(int argc, char *argv[])
 
 	while(1)  // loop infinito
 	{
+		if(parametri_lattice.eof()) break;     // uscita dal loop infinito alla fine del file
 		parametri_lattice >> utile_per_contare;
 		parametri_lattice >> parametro_1;
 		parametri_lattice >> parametro_2;
 
-		if(parametri_lattice.eof()) break;     // uscita dal loop infinito alla fine del file
 		parametri_lattice.ignore(1000, '\n');  // finche' il file non e' finito saltare a fine riga
 		if (utile_per_contare == "O") N_tipi[_DRIFT_]++;
 		else if (utile_per_contare == "S") N_tipi[_SOLENOID_]++;
@@ -415,6 +411,12 @@ int main(int argc, char *argv[])
 
 	int numero_elementi_lattice= 0;
 	for(int i=0; i < N_TIPI_MAGNETICI; i++) numero_elementi_lattice += N_tipi[i];
+
+	log_file << "Number of elements in the lattice: " << numero_elementi_lattice << std::endl;
+	log_file << "Number of drifts: " << N_tipi[_DRIFT_] << std::endl;
+	log_file << "Number of solenoids: " << N_tipi[_SOLENOID_] << std::endl;
+	log_file << "Number of focusing quadrupoles: " << N_tipi[_FOCUSING_] << std::endl;
+	log_file << "Number of defocusing quadrupoles: " << N_tipi[_DEFOCUSING_] << std::endl;
 
 	if (numero_elementi_lattice == 0)
 	{
@@ -488,11 +490,6 @@ int main(int argc, char *argv[])
 		contatore++;
 	}
 
-	create_gnuplot_file(gnuplot_filename_string, run_name, param);
-
-	double beta = sqrt(2.0*E0/MP_MEV);
-	double pz0 = sqrt(beta*beta - px0*px0 - py0*py0);
-
 	double * x = new double[N_DIMENSIONI_SPAZIO_FASI+1];			// x, x', y, y', z, pz, beta_tot
 	x[0] = x0;
 	x[1] = px0/pz0;
@@ -501,36 +498,91 @@ int main(int argc, char *argv[])
 	x[4] = z0;
 	x[5] = pz0;
 	x[6] = beta;
-	output_file << x[0] << "\t" << x[2] << "\t" << x[4] << "\t" << x[1]*x[5] << "\t" << x[3]*x[5] << "\t" << x[5] << std::endl;
+	output_file << std::setprecision(6) << std::setiosflags(std::ios::scientific) 
+		        << x[0] << "\t" << x[2] << "\t" << x[4] << "\t" << x[1]*x[5] << "\t" << x[3]*x[5] << "\t" << x[5] << std::endl;
 
-	double * xstep = new double[(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice];
+	double * xstep = new double[(N_DIMENSIONI_SPAZIO_FASI+1)*(numero_elementi_lattice+1)];
 
 	double * xnew = new double[(N_DIMENSIONI_SPAZIO_FASI+1)];
-	for (int i = 0; i < N_DIMENSIONI_SPAZIO_FASI; i++) xnew[i] = 0.0;
+	for (int i = 0; i < N_DIMENSIONI_SPAZIO_FASI; i++) xnew[i] = x[i];
+	xnew[6] = x[6];
 
 	int numero_step_per_elemento = nsteps / numero_elementi_lattice;
 	numero_step_per_elemento++;
 
 	double posizione = 0.0;
 	double deltaZ;
+	double xmax = 0.0, ymax = 0.0, xmax_temp, ymax_temp, massimo_globale;
 
 	for (int i = 0; i < numero_elementi_lattice; i++)
 	{
 		deltaZ = param[N_PARAMETRI_LATTICINO*i+2] / (double) numero_step_per_elemento;
+		for (int j = 0; j < N_DIMENSIONI_SPAZIO_FASI; j++) xstep[j+(N_DIMENSIONI_SPAZIO_FASI+1)*i] = xnew[j];
+		xstep[6+(N_DIMENSIONI_SPAZIO_FASI+1)*i] = xnew[6];
+		posizione = 0.0;
 		for (int j = 0; j < numero_step_per_elemento; j++)
 		{
 			posizione += deltaZ;
-			if (param[N_PARAMETRI_LATTICINO*i] < _DRIFT_CHECK_) Drift::mappa_(x, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
-			else if (param[N_PARAMETRI_LATTICINO*i] < _SOLENOID_CHECK_) Solenoid::mappa_(x, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
-			else if (param[N_PARAMETRI_LATTICINO*i] < _FOCUSING_CHECK_) Focusing::mappa_(x, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
-			else if (param[N_PARAMETRI_LATTICINO*i] < _DEFOCUSING_CHECK_) Defocusing::mappa_(x, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
-			else std::cerr << "Out of lattice" << std::endl;
-			output_file << x[0] << "\t" << x[2] << "\t" << x[4] << "\t" << x[1]*x[5] << "\t" << x[3]*x[5] << "\t" << x[5] << std::endl;
+			xnew[4] += deltaZ;
+			if (param[N_PARAMETRI_LATTICINO*i] < _DRIFT_CHECK_)
+			{
+				Drift::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
+#if defined (DEBUG)
+				log_file << "step # " << i*numero_step_per_elemento+j << ", element #" << i << ", step inside #" << j << ", type: " << param[N_PARAMETRI_LATTICINO*i] << ", reached z = " << xnew[4] << ", inside element z_i = " << posizione << std::endl;
+#endif
+			}
+			else if (param[N_PARAMETRI_LATTICINO*i] < _SOLENOID_CHECK_) 
+			{
+				Solenoid::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
+#if defined (DEBUG)
+				log_file << "step # " << i*numero_step_per_elemento+j << ", element #" << i << ", step inside #" << j << ", type: " << param[N_PARAMETRI_LATTICINO*i] << ", reached z = " << xnew[4] << ", inside element z_i = " << posizione << std::endl;
+#endif
+			}
+			else if (param[N_PARAMETRI_LATTICINO*i] < _FOCUSING_CHECK_) 
+			{
+				Focusing::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
+#if defined (DEBUG)
+				log_file << "step # " << i*numero_step_per_elemento+j << ", element #" << i << ", step inside #" << j << ", type: " << param[N_PARAMETRI_LATTICINO*i] << ", reached z = " << xnew[4] << ", inside element z_i = " << posizione << std::endl;
+#endif
+			}
+			else if (param[N_PARAMETRI_LATTICINO*i] < _DEFOCUSING_CHECK_) 
+			{
+				Defocusing::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
+#if defined (DEBUG)
+				log_file << "step # " << i*numero_step_per_elemento+j << ", element #" << i << ", step inside #" << j << ", type: " << param[N_PARAMETRI_LATTICINO*i] << ", reached z = " << xnew[4] << ", inside element z_i = " << posizione << std::endl;
+#endif
+			}
+			else 
+			{
+				std::cerr << "Out of lattice while analyzing ";
+#if defined (DEBUG)
+				log_file << "step # " << i*numero_step_per_elemento+j << ", element #" << i << ", step inside #" << j << ", type: " << param[N_PARAMETRI_LATTICINO*i] << ", reached z = " << xnew[4] << ", inside element z_i = " << posizione << std::endl;
+#endif
+			}
+			output_file << std::setprecision(6) << std::setiosflags(std::ios::scientific) 
+				        << xnew[0] << "\t" << xnew[2] << "\t" << xnew[4] << "\t" << xnew[1]*xnew[5] << "\t" << xnew[3]*xnew[5] << "\t" << xnew[5] << std::endl;
+			xmax_temp = fabs(xnew[0]);
+			ymax_temp = fabs(xnew[2]);
+			if (xmax_temp > xmax) xmax = xmax_temp;
+			if (ymax_temp > ymax) ymax = ymax_temp;
 		}
-		for (int j = 0; j < N_DIMENSIONI_SPAZIO_FASI; j++) xstep[j+i] = xnew[j];
-		xstep[6+i] = x[6];
-		output_file << xnew[0] << "\t" << xnew[2] << "\t" << xnew[4] << "\t" << xnew[1]*xnew[5] << "\t" << xnew[3]*xnew[5] << "\t" << xnew[5] << std::endl;
 	}
+
+	for (int j = 0; j < N_DIMENSIONI_SPAZIO_FASI; j++) xstep[j+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice] = xnew[j];
+	xstep[6+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice] = xnew[6];
+
+	if (xstep[4+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice] < zmax) Drift::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice, xnew, (zmax-xstep[4+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice]),  param);  // nb: passiamo parametri qualunque, tanto il drift non li usa
+	xnew[4] = zmax;
+	output_file << std::setprecision(6) << std::setiosflags(std::ios::scientific) 
+		        << xnew[0] << "\t" << xnew[2] << "\t" << xnew[4] << "\t" << xnew[1]*xnew[5] << "\t" << xnew[3]*xnew[5] << "\t" << xnew[5] << std::endl;
+	xmax_temp = fabs(xnew[0]);
+	ymax_temp = fabs(xnew[2]);
+	if (xmax_temp > xmax) xmax = xmax_temp;
+	if (ymax_temp > ymax) ymax = ymax_temp;
+
+	xmax > ymax ? massimo_globale=xmax : massimo_globale=ymax;
+
+	create_gnuplot_file(gnuplot_filename_string, run_name, param, numero_elementi_lattice, massimo_globale, x[4], zmax);
 
 	log_file.close();
 	output_file.close();

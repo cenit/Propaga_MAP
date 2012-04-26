@@ -9,7 +9,7 @@ Copyright 2010, 2011, 2012 Stefano Sinigardi, Graziano Servizi, Giorgio Turchett
 #pragma warning(disable : 981)
 #endif
 
-
+#define DEBUG
 
 #include <cstdio>
 #include <iostream>
