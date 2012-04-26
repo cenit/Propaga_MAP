@@ -41,7 +41,7 @@ struct Drift : public Elemento_magnetico
 		lunghezza = l;
 	}
 //	mappa_(double * xoriginale,  double * xevoluto, double zeta, double * parametriElemento);
-	static void mappa_(double *,  double *, double, double *);
+	static void mappa_(double *,  double *, double, double *, bool);
 };
 
 
@@ -53,7 +53,7 @@ struct Solenoid : public Elemento_magnetico
 		lunghezza = l, 
 		parametro1 = k1;
 	}
-	static void mappa_(double *, double *, double, double *);
+	static void mappa_(double *, double *, double, double *, bool);
 };
 
 
@@ -65,7 +65,7 @@ struct Focusing : public Elemento_magnetico
 		lunghezza = l, 
 		parametro1 = k1;
 	}
-	static void mappa_(double *,  double *, double, double *);
+	static void mappa_(double *,  double *, double, double *, bool);
 };
 
 
@@ -77,11 +77,11 @@ struct Defocusing : public Elemento_magnetico
 		lunghezza = l, 
 		parametro1 = k1;
 	}
-	static void mappa_(double *,  double *, double, double *);
+	static void mappa_(double *,  double *, double, double *, bool);
 };
 
 
-void  Drift :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param)
+void  Drift :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param, bool latest)
 {
 	double D[4][4];
 	memset((void *)Xnew, 0, 4*sizeof(double));
@@ -96,16 +96,17 @@ void  Drift :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param)
 }
 
 
-void  Solenoid :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param)
+void  Solenoid :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param, bool latest)
 {
 	// Xold[] = {x, x', y, y', z, pz, beta}
 	// Param[] = {tipo, posizione_iniziale, lunghezza, campo}
 
 	double beta = Xold[6];
-	double sk = sqrt((Param[3]/beta)*(Param[3]/beta));
-	double alpha = (Param[2]) * sk;
+	double omega_L = Param[3]*0.5;
+	double sk = omega_L / beta;
+//	double alpha = (Param[2]) * sk;
 //	double phi = (zeta - Param[1]) * sk;
-	double phi = zeta * sk;
+	double phi = zeta * sk * 2.0;
 	
 	double *ret = new double[4];
 	double M[4][4], R[4][4];
@@ -113,7 +114,7 @@ void  Solenoid :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param
 		for(int j=0; j < 4; j++)
 			M[i][j] = R[i][j] = 0.0;
 
-	if (zeta < (Param[1]+Param[2]))
+	if (!latest)
 	{
 		M[0][0] = R[0][0] = M[1][1] = R[1][1] = M[2][2] = R[2][2] = M[3][3] = R[3][3] = cos(phi);
 
@@ -128,13 +129,12 @@ void  Solenoid :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param
 	}
 	else
 	{
-		M[0][0] = R[0][0] = M[1][1] = R[1][1] = M[2][2] = R[2][2] = M[3][3] = R[3][3] = cos(alpha);
+		M[0][0] = R[0][0] = M[1][1] = R[1][1] = M[2][2] = R[2][2] = M[3][3] = R[3][3] = cos(phi);
 
-		R[0][2] = R[1][3] = sin(alpha);
-		R[2][0] = R[3][1] = -sin(alpha);
-
-		M[0][1] = M[2][3] = sin(alpha) / sk;
-		M[1][0] = M[3][2] = -sin(alpha) * sk;
+		M[0][1] = M[2][3] = sin(phi) / sk;
+		M[1][0] = M[3][2] = -sin(phi) * sk;
+		R[0][2] = R[1][3] = sin(phi);
+		R[2][0] = R[3][1] = -sin(phi);
 	}
 
 	memset((void *)ret, 0, 4*sizeof(double));
@@ -151,11 +151,11 @@ void  Solenoid :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param
 }
 
 
-void  Focusing :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param)
+void  Focusing :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param, bool latest)
 {
 	// Xold[] = {x, x', y, y', z, pz, beta}
 	// Param[] = {tipo, posizione_iniziale, lunghezza, campo}
-	double kF = Param[3];
+	double kF = Param[3]/Xold[6];
 
 //	double zetaF = zeta - Param[1];
 	double zetaF = zeta;
@@ -186,11 +186,11 @@ void  Focusing :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param
 }
 
 
-void  Defocusing :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param)
+void  Defocusing :: mappa_(double *Xold,  double *Xnew, double zeta, double *Param, bool latest)
 {
 	// Xold[] = {x, x', y, y', z, pz, beta}
 	// Param[] = {tipo, posizione_iniziale, lunghezza, campo}
-	double kD = Param[3];
+	double kD = Param[3]/Xold[6];
 
 //	double zetaD = zeta - Param[1];
 	double zetaD = zeta;
@@ -448,6 +448,8 @@ int main(int argc, char *argv[])
 			param[N_PARAMETRI_LATTICINO*contatore+3] = 0.0;					// campo
 			drift++;
 			lunghezza_totale += parametro_letto_1;
+			log_file << "Element #" << contatore << ": type: " << param[N_PARAMETRI_LATTICINO*contatore] << ", initial position: " << param[N_PARAMETRI_LATTICINO*contatore+1]
+					 << " cm, length: " << param[N_PARAMETRI_LATTICINO*contatore+2] << " cm, parameter: " << param[N_PARAMETRI_LATTICINO*contatore+3] << " (CGS)" << std::endl;
 		}
 		else if (utile_per_contare == "S")
 		{
@@ -455,10 +457,13 @@ int main(int argc, char *argv[])
 			param[N_PARAMETRI_LATTICINO*contatore] = (double) _SOLENOID_;	// tipo
 			param[N_PARAMETRI_LATTICINO*contatore+1] = lunghezza_totale;	// posizione iniziale
 			param[N_PARAMETRI_LATTICINO*contatore+2] = parametro_letto_1;	// lunghezza
-			temp = CHARGE * parametro_letto_2 * FROM_TESLA_TO_GAUSS / (MP*C*C);
+			if (parametro_letto_2 < 0.0) log_temp << "Attention: you defined a solenoid with negative magnetic field; reverted sign!" << std::endl;
+			temp = fabs(CHARGE * parametro_letto_2 * FROM_TESLA_TO_GAUSS / (MP*C*C));
 			param[N_PARAMETRI_LATTICINO*contatore+3] = temp;				// campo
 			solenoid++;
 			lunghezza_totale += parametro_letto_1;
+			log_file << "Element #" << contatore << ": type: " << param[N_PARAMETRI_LATTICINO*contatore] << ", initial position: " << param[N_PARAMETRI_LATTICINO*contatore+1]
+					 << " cm, length: " << param[N_PARAMETRI_LATTICINO*contatore+2] << " cm, parameter: " << param[N_PARAMETRI_LATTICINO*contatore+3] << " (CGS)" << std::endl;
 		}
 		else if (utile_per_contare == "F")
 		{
@@ -466,12 +471,15 @@ int main(int argc, char *argv[])
 			param[N_PARAMETRI_LATTICINO*contatore] = (double) _FOCUSING_;	// tipo
 			param[N_PARAMETRI_LATTICINO*contatore+1] = lunghezza_totale;	// posizione iniziale
 			param[N_PARAMETRI_LATTICINO*contatore+2] = parametro_letto_1;	// lunghezza
-			temp = parametro_letto_2 * FROM_TESLA_TO_GAUSS / FROM_M_TO_CM;
-			if (parametro_letto_1 > sqrt(temp)) log_file << "Attention: you're outside of the range of the thin lens approximation" << std::endl;
-			temp = CHARGE * parametro_letto_2 * FROM_TESLA_TO_GAUSS / (FROM_M_TO_CM * MP * C * C);
+			if (parametro_letto_2 < 0.0) log_file << "Attention: usually a focusing quadrupole has a positive gradient!" << std::endl;
+			temp = sqrt(fabs(parametro_letto_2 * FROM_TESLA_TO_GAUSS / FROM_M_TO_CM));
+			if (parametro_letto_1 > temp) log_file << "Attention: you're outside of the range of the thin lens approximation" << std::endl;
+			temp = fabs(CHARGE * parametro_letto_2 * FROM_TESLA_TO_GAUSS / (FROM_M_TO_CM*MP*C*C));
 			param[N_PARAMETRI_LATTICINO*contatore+3] = temp;				// campo
 			focusing++;
 			lunghezza_totale += parametro_letto_1;
+			log_file << "Element #" << contatore << ": type: " << param[N_PARAMETRI_LATTICINO*contatore] << ", initial position: " << param[N_PARAMETRI_LATTICINO*contatore+1]
+					 << " cm, length: " << param[N_PARAMETRI_LATTICINO*contatore+2] << " cm, parameter: " << param[N_PARAMETRI_LATTICINO*contatore+3] << " (CGS)" << std::endl;
 		}
 		else if (utile_per_contare == "D")
 		{
@@ -479,16 +487,22 @@ int main(int argc, char *argv[])
 			param[N_PARAMETRI_LATTICINO*contatore] = (double) _DEFOCUSING_;	// tipo
 			param[N_PARAMETRI_LATTICINO*contatore+1] = lunghezza_totale;	// posizione iniziale
 			param[N_PARAMETRI_LATTICINO*contatore+2] = parametro_letto_1;	// lunghezza
-			temp = parametro_letto_2 * FROM_TESLA_TO_GAUSS / FROM_M_TO_CM;
-			if (parametro_letto_1 > sqrt(temp)) log_file << "Attention: you're outside of the range of the thin lens approximation" << std::endl;
-			temp = CHARGE * parametro_letto_2 * FROM_TESLA_TO_GAUSS / (FROM_M_TO_CM * MP * C * C);
+			if (parametro_letto_2 > 0.0) log_file << "Attention: usually a defocusing quadrupole has a negative gradient!" << std::endl;
+			temp = sqrt(fabs(parametro_letto_2 * FROM_TESLA_TO_GAUSS / FROM_M_TO_CM));
+			if (parametro_letto_1 > temp) log_file << "Attention: you're outside of the range of the thin lens approximation" << std::endl;
+			temp = fabs(CHARGE * parametro_letto_2 * FROM_TESLA_TO_GAUSS / (FROM_M_TO_CM*MP*C*C));
 			param[N_PARAMETRI_LATTICINO*contatore+3] = temp;				// campo
 			defocusing++;
 			lunghezza_totale += parametro_letto_1;
+			log_file << "Element #" << contatore << ": type: " << param[N_PARAMETRI_LATTICINO*contatore] << ", initial position: " << param[N_PARAMETRI_LATTICINO*contatore+1]
+					 << " cm, length: " << param[N_PARAMETRI_LATTICINO*contatore+2] << " cm, parameter: " << param[N_PARAMETRI_LATTICINO*contatore+3] << " (CGS)" << std::endl;
 		}
 		else log_file << "Something is wrong in the lattice file: " << utile_per_contare << " is not recognized\n";
 		contatore++;
 	}
+
+	log_file << "Total lattice length: " << lunghezza_totale << " cm" << std::endl;
+	if (lunghezza_totale < zmax) log_file << "Will do a drift at the end to reach z = " << zmax << " cm" << std::endl;
 
 	double * x = new double[N_DIMENSIONI_SPAZIO_FASI+1];			// x, x', y, y', z, pz, beta_tot
 	x[0] = x0;
@@ -514,8 +528,12 @@ int main(int argc, char *argv[])
 	double deltaZ;
 	double xmax = 0.0, ymax = 0.0, xmax_temp, ymax_temp, massimo_globale;
 
+	log_file << "\nWORKING..." << std::endl;
+	bool latest;
+
 	for (int i = 0; i < numero_elementi_lattice; i++)
 	{
+		latest = false;
 		deltaZ = param[N_PARAMETRI_LATTICINO*i+2] / (double) numero_step_per_elemento;
 		for (int j = 0; j < N_DIMENSIONI_SPAZIO_FASI; j++) xstep[j+(N_DIMENSIONI_SPAZIO_FASI+1)*i] = xnew[j];
 		xstep[6+(N_DIMENSIONI_SPAZIO_FASI+1)*i] = xnew[6];
@@ -526,34 +544,39 @@ int main(int argc, char *argv[])
 			xnew[4] += deltaZ;
 			if (param[N_PARAMETRI_LATTICINO*i] < _DRIFT_CHECK_)
 			{
-				Drift::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
+				if (j == numero_step_per_elemento-1) latest = true;
+				Drift::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i, latest);
 #if defined (DEBUG)
 				log_file << "step # " << i*numero_step_per_elemento+j << ", element #" << i << ", step inside #" << j << ", type: " << param[N_PARAMETRI_LATTICINO*i] << ", reached z = " << xnew[4] << ", inside element z_i = " << posizione << std::endl;
 #endif
 			}
 			else if (param[N_PARAMETRI_LATTICINO*i] < _SOLENOID_CHECK_) 
 			{
-				Solenoid::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
+				if (j == numero_step_per_elemento-1) latest = true;
+				Solenoid::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i, latest);
 #if defined (DEBUG)
 				log_file << "step # " << i*numero_step_per_elemento+j << ", element #" << i << ", step inside #" << j << ", type: " << param[N_PARAMETRI_LATTICINO*i] << ", reached z = " << xnew[4] << ", inside element z_i = " << posizione << std::endl;
 #endif
 			}
 			else if (param[N_PARAMETRI_LATTICINO*i] < _FOCUSING_CHECK_) 
 			{
-				Focusing::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
+				if (j == numero_step_per_elemento-1) latest = true;
+				Focusing::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i, latest);
 #if defined (DEBUG)
 				log_file << "step # " << i*numero_step_per_elemento+j << ", element #" << i << ", step inside #" << j << ", type: " << param[N_PARAMETRI_LATTICINO*i] << ", reached z = " << xnew[4] << ", inside element z_i = " << posizione << std::endl;
 #endif
 			}
 			else if (param[N_PARAMETRI_LATTICINO*i] < _DEFOCUSING_CHECK_) 
 			{
-				Defocusing::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i);
+				if (j == numero_step_per_elemento-1) latest = true;
+				Defocusing::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*i, xnew, posizione,  param+N_PARAMETRI_LATTICINO*i, latest);
 #if defined (DEBUG)
 				log_file << "step # " << i*numero_step_per_elemento+j << ", element #" << i << ", step inside #" << j << ", type: " << param[N_PARAMETRI_LATTICINO*i] << ", reached z = " << xnew[4] << ", inside element z_i = " << posizione << std::endl;
 #endif
 			}
 			else 
 			{
+				if (j == numero_step_per_elemento-1) latest = true;
 				std::cerr << "Out of lattice while analyzing ";
 #if defined (DEBUG)
 				log_file << "step # " << i*numero_step_per_elemento+j << ", element #" << i << ", step inside #" << j << ", type: " << param[N_PARAMETRI_LATTICINO*i] << ", reached z = " << xnew[4] << ", inside element z_i = " << posizione << std::endl;
@@ -571,7 +594,7 @@ int main(int argc, char *argv[])
 	for (int j = 0; j < N_DIMENSIONI_SPAZIO_FASI; j++) xstep[j+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice] = xnew[j];
 	xstep[6+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice] = xnew[6];
 
-	if (xstep[4+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice] < zmax) Drift::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice, xnew, (zmax-xstep[4+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice]),  param);  // nb: passiamo parametri qualunque, tanto il drift non li usa
+	if (xstep[4+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice] < zmax) Drift::mappa_(xstep+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice, xnew, (zmax-xstep[4+(N_DIMENSIONI_SPAZIO_FASI+1)*numero_elementi_lattice]),  param, true);  // nb: passiamo parametri qualunque, tanto il drift non li usa
 	xnew[4] = zmax;
 	output_file << std::setprecision(6) << std::setiosflags(std::ios::scientific) 
 		        << xnew[0] << "\t" << xnew[2] << "\t" << xnew[4] << "\t" << xnew[1]*xnew[5] << "\t" << xnew[3]*xnew[5] << "\t" << xnew[5] << std::endl;
