@@ -1,0 +1,32 @@
+language: cpp
+
+os:
+  - linux
+  - osx
+
+compiler:
+    - gcc
+    - clang
+
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - gcc-6
+    - g++-6
+
+matrix:
+    exclude:
+    - os: osx
+      compiler: gcc
+    - os: linux
+      compiler: clang
+
+
+install:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then if [[ "$CXX" == "g++" ]]; then export CXX="g++-6" CC="gcc-6" ;fi                          ;fi
+
+
+script:
+  - mkdir build && cd build && cmake .. && cmake --build .

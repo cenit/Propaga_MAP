@@ -1,0 +1,31 @@
+{
+  // See https://go.microsoft.com//fwlink//?linkid=834763 for more information about this file.
+  "configurations": [
+    {
+      "buildCommandArgs": "-m -v:minimal",
+      "buildRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\build\\${name}",
+      "configurationType": "Debug",
+      "generator": "Visual Studio 15 2017",
+      "name": "x86-Debug",
+      "variables": [
+        {
+          "name": "CMAKE_TOOLCHAIN_FILE",
+          "value": "${env.WORKSPACE}\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
+        }
+      ]
+    },
+    {
+      "buildCommandArgs": "-m -v:minimal",
+      "buildRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\build\\${name}",
+      "configurationType": "Release",
+      "generator": "Visual Studio 15 2017",
+      "name": "x86-Release",
+      "variables": [
+        {
+          "name": "CMAKE_TOOLCHAIN_FILE",
+          "value": "${env.WORKSPACE}\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
+        }
+      ]
+    }
+  ]
+}
